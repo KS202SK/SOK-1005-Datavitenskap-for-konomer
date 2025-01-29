@@ -1,0 +1,170 @@
+---
+title: "Assignment 1, SOK-1005 V25"
+author: C.18
+format: html
+echo: false
+output: true
+editor: visual
+---
+
+```{r, message=FALSE, warning=FALSE}
+# installing the needed libraries 
+library(tidyverse)
+library(lubridate)
+library(readr)
+library(dplyr)
+library(ggplot2)
+```
+
+```{r, message=FALSE, warning=FALSE}
+# First we download the data from the four sub-regions of the earth
+# By using the code from the "Small task" in class, we can read the tables from the website, and get the needed data
+
+# Downloading data from the lower troposphere
+df_lower <- read_table2("https://www.nsstc.uah.edu/data/msu/v6.0/tlt/uahncdc_lt_6.0.txt")
+
+
+# repeating the process for the remaining 3 datasets
+
+# Downloading data from the mid-troposphere
+df_mid <- read_table2("https://www.nsstc.uah.edu/data/msu/v6.0/tmt/uahncdc_mt_6.0.txt")
+
+
+# Downloading data from the tropopause
+df_trop <- read_table2("https://www.nsstc.uah.edu/data/msu/v6.0/ttp/uahncdc_tp_6.0.txt")
+
+
+# Downloading data from the lower stratosphere
+df_strat <- read_table2("https://www.nsstc.uah.edu/data/msu/v6.0/tls/uahncdc_ls_6.0.txt")
+```
+
+```{r, message=FALSE, warning=FALSE}
+
+# We don't need all the colomns in our tables, we will therefore filter them
+# The colomn we need is the globe colomn, we also do not need the row for 1978
+
+# We also want to change the colomn Year, to show the date, using the lubridate library
+
+df_lower <- df_lower%>% 
+  # filtering out 1978
+  filter(Year != 1978) %>%
+  # changing the dating-format
+  mutate(Date = ymd(paste(Year, Mo, 1, sep="-"))) %>% 
+  # selecting only the needed colomns
+  select(Date, Globe)
+
+
+
+# repeat the process for the remaining tables
+
+df_mid <- df_mid %>% 
+  filter(Year != 1978) %>% 
+  mutate(Date = ymd(paste(Year, Mo, 1, sep="-"))) %>% 
+  select(Date, Globe)
+
+
+df_trop <- df_trop%>% 
+  filter(Year != 1978) %>% 
+  mutate(Date = ymd(paste(Year, Mo, 1, sep="-"))) %>% 
+  select(Date, Globe)
+
+
+
+df_strat <- df_strat %>% 
+  filter(Year != 1978) %>% 
+  mutate(Date = ymd(paste(Year, Mo, 1, sep="-"))) %>% 
+  select(Date, Globe)
+```
+
+```{r, message=FALSE, warning=FALSE}
+# Next we want to combine the tables together so we later can make them into one singular plot
+
+# The year colomn can stay, but to avoid confusion we rename the globe colomns so that the data does not get mixed up in our new big dataset
+
+df_lower <- df_lower %>% rename(`Lower Troposphere` = Globe)
+df_mid <- df_mid %>% rename(`Mid-Troposphere` = Globe)
+df_trop <- df_trop %>% rename(Tropopause = Globe)
+df_strat <- df_strat %>% rename(`Lower Stratosphere` = Globe)
+
+# Now we can use the full_join function to make our four tables into one big table
+
+df_globe <- df_lower %>%
+  full_join(df_mid, by = "Date") %>%
+  full_join(df_trop, by = "Date") %>%
+  full_join(df_strat, by = "Date")
+
+# by looking at the type of data our globe table is, we see most of them are characters, so we have to convert them to numeric
+
+df_globe <- df_globe %>%
+  mutate_if(is.character, as.numeric)
+
+
+# the change from year to date could in this assignment be deemed unnecessary, but I personally think it's nice to have bigger tables that leads us to sub-tables, such as now when we make our big temperature table into an average temperature table. It does lead to some extra lines of code, but it would make it easier if i later wanted to observe something else
+```
+
+```{r, message=FALSE, warning=FALSE}
+# Since we changed the format to date and we're looking for the yearly average, we have to extract the year back from the date function
+
+# now we can find the average (mean) temperature, and group the results by year
+
+
+df_average_globe <- df_globe %>%
+  mutate(Year = year(Date)) %>% 
+  group_by(Year) %>%
+  # we use the round() function to make our numbers more managable
+  summarise(
+    Avg_Lower = round(mean(`Lower Troposphere`, na.rm = TRUE), 3),
+    Avg_Mid = round(mean(`Mid-Troposphere`, na.rm = TRUE), 3),
+    Avg_Trop = round(mean(Tropopause, na.rm = TRUE), 3),
+    Avg_Strat = round(mean(`Lower Stratosphere`, na.rm = TRUE), 3)
+  )
+
+# now we can combine our colomns together to plot with them using pivot_longer
+df_average_globe_long <- df_average_globe %>%
+  pivot_longer(cols = starts_with("Avg"),
+               names_to = "Globe",        
+               values_to = "Value")
+
+
+```
+
+```{r, message=FALSE, warning=FALSE}
+# Using our long-plot we can plot our figure using ggplot
+# most of the plot-code have taken inspiration or have been copied from previous assignments in SOK-1004
+
+df_average_globe_long %>% 
+  # making our axis's and setting each curve its own color
+  ggplot(aes(Year, Value, color = Globe)) +
+  # making points for each year's value
+  geom_point(size = 2) + 
+  # making a line that connects the points for each part of the globe
+  geom_line() +
+  # making a fitting title, subtitle and axis titles
+  labs(
+    title = "Global temperature change per year",
+    subtitle = "1979 - 2024",
+    x = "Year",
+    y = "Average temperature change (in Cº)",
+    color = "Part of the Globe",
+    caption = "Source: Spencer, R., Latest Global Temperatures") +
+  # set a minimal theme
+  theme_minimal() +
+  theme(
+    # putting the position of the legend on the bottom, to widen our plot
+    legend.position = "bottom",
+    # making our title bigger and bolder, placing it in the middle
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+    # placing the subtitle in the middle
+    plot.subtitle = element_text(hjust = 0.5),
+    # placing the axis titles in the middle and making them bold
+    axis.title.x = element_text(hjust = 0.5, face = "bold"),
+    axis.title.y = element_text(hjust = 0.5, face = "bold")
+  ) +
+  # adjusting the y-axis so that the data gets spread nicely
+  scale_y_continuous(limits = c(-0.55, 1.3), breaks = seq(-0.55, 1.3, by = 0.25))+
+  # adjusting the x-axis
+  scale_x_continuous(breaks = seq(1979, 2024, by = 3))+
+  # changing the names on the labels
+  scale_color_discrete(labels = c("Lower Troposphere", "Mid Troposphere", "Tropopause", "Lower Stratosphere"))
+
+```
