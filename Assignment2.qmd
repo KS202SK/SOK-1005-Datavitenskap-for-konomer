@@ -1,0 +1,302 @@
+---
+title: "Assignment 2, SOK-1005 V25"
+author: C.18
+format: html
+echo: false
+output: true
+editor: visual
+---
+
+```{r, warning = FALSE, message = FALSE}
+# downloading the needed libraries
+
+library(tidyverse)
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(janitor)
+```
+
+## Task 1
+
+```{r, warning = FALSE, message = FALSE, results = 'hide'}
+
+# first we download the table in the file
+# I asked chatgpt how to download raw data from a github link, and it helped me make the following code
+url <- "https://raw.githubusercontent.com/uit-sok-1005-v23/uit-sok-1005-v23.github.io/main/storedata.csv"
+df <- read.csv(url)
+```
+
+```{r, warning = FALSE, message = FALSE, results = 'hide'}
+
+table_1 <- df %>% 
+  # first we select the needed colomns
+  select(Order_Date, Sales, Customer_Segment, Region) %>% 
+  
+  # then we can filter out the regions and customer segments
+  filter(Region %in% c("Region 1", "Region 9")) %>% 
+  filter(Customer_Segment %in% c("Corporate", "Consumer")) %>% 
+  
+  # next we have to convert our dates from character to dates
+  mutate(date = ymd(Order_Date)) %>% 
+  # we can also make a month-colomn so we get the average sales per month
+  mutate(year = year(date),
+         month = month(date)) %>% 
+  # we can then filter to only the months and years we need
+  filter(year == 2017 & month %in% c(10, 11, 12)) %>% 
+  
+  # since we want to fint the total sales of two different segments in three different months, we group by them to get seperate totals
+  group_by(Customer_Segment, month) %>% 
+  
+  # next we can find the total saves per month
+  summarise(total_sales = sum(Sales, na.rm = TRUE))
+
+table_1
+```
+
+```{r, warning = FALSE, message = FALSE, results = 'hide'}
+#2: Make a plot of the monthly total Sales in Region 1 and Region 13 in 2015, 2016, and 2017. This output is Figure 1.
+
+# we copy the code from task 1, then adjust the code to fit our new task
+figure_1 <- df %>% 
+   select(Order_Date, Sales, Region) %>% 
+  
+  # then we can filter out the regions
+  filter(Region %in% c("Region 1", "Region 13")) %>% 
+  
+  # next we have to convert our dates from character to dates
+  mutate(date = ymd(Order_Date)) %>% 
+  # we can also make a month-colomn so we get the average sales per month
+  mutate(year = year(date),
+         month = month(date)) %>% 
+  # we can then filter to only and years we need
+  filter(year %in% c(2015, 2016, 2017)) %>% 
+  # we can make a year_month variable that reduces the amounts of colomns we need
+  mutate(year_month = make_date(year, month, 1)) %>% 
+  
+  # group by the year and month
+  group_by(Region, year_month) %>% 
+  
+  # next we can find the total saves per month
+  summarise(total_sales = sum(Sales, na.rm = TRUE))
+  
+
+# now we can make our plot
+
+figure_1 %>% 
+  
+  ggplot(aes(year_month, total_sales, color = Region)) +
+  
+  # the type of plot we use is chosen bases on the plots purpose, whether it is to show how the sales have developed over time or simply to show how big the sales have been. Since the task doesn't specify what results we want to convey, I decided a bar plot would be best, as it shows how big the sales are in the two different regions
+  geom_line(size = 2) +
+  scale_color_manual(values = c("Region 1" = "forestgreen", "Region 13" = "coral")) +
+  # making a fitting title, subtitle and axis titles
+  labs(
+    title = "Total sales within Region 1 and 13",
+    subtitle = "2015 - 2017",
+    x = "Time of year",
+    y = "Total sales (in ?)",
+    color = "Region",
+    caption = "Source: GitHub") +
+  # set a minimal theme
+  theme_minimal() +
+  theme(
+    # putting the position of the legend on the bottom, to widen our plot
+    legend.position = "bottom",
+    # making our title bigger and bolder, placing it in the middle
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+    # placing the subtitle in the middle
+    plot.subtitle = element_text(hjust = 0.5),
+    # placing the axis titles in the middle and making them bold
+    axis.title.x = element_text(hjust = 0.5, face = "bold"),
+    axis.title.y = element_text(hjust = 0.5, face = "bold")
+  )
+```
+
+```{r, warning = FALSE, message = FALSE, results = 'hide'}
+
+# 3: In Figure 1, identify the months where the total Sales in Region 13 is greater than the total Sales in Region 1. This output is Table 2.
+
+# the code is taken from lecture 4, then adjusted to fit the task
+table_2 <- figure_1 %>% 
+  # giving the regions each their colomn
+  pivot_wider(names_from = Region, values_from = total_sales) %>% 
+  # cleaning the names so they're easier to use
+  clean_names() %>% 
+  # filtering for the months region 13 was greater than region 1
+  filter(region_13 > region_1)
+
+table_2
+```
+
+```{r, warning = FALSE, message = FALSE, results = 'hide'}
+
+#4: Find the average Profit per Customer_Segment and Product_Category in 2017, for all regions except Region 3, 5 and 8. What segment produced the highest average profit? This output is Table 3.
+
+table_3 <- df %>% 
+
+  # first we select the needed categories
+  select(Order_Date, Profit, Customer_Segment, Product_Category, Region) %>% 
+  
+  # we can then again make years out of the order date, as well as filter the year we need
+  mutate(date = ymd(Order_Date),
+         year = year(date)) %>% 
+  filter(year == 2017) %>% 
+  # we can removed the other colomns now that we have the yearly one
+  select(-Order_Date, -date) %>% 
+  
+  # next we filter out the regions we don't want in the table
+  filter(!Region %in% c("Region 3", "Region 5", "Region 8")) %>% 
+  
+  # next we can group by the variables and then summarise the profits
+  group_by(Region, year, Customer_Segment, Product_Category) %>% 
+  
+  summarise(average_profit = sum(Profit, na.rm = TRUE)) %>% 
+  
+  # to find the segment with the highest average profit, we can arrange the table from descending values
+  arrange(desc(average_profit))
+
+table_3
+
+# now we can see that Technology in Region 12 had the highest average profit
+```
+
+## Task 2
+
+```{r, warning = FALSE, message = FALSE, results = 'hide'}
+
+library(rvest)
+url <- "https://www.motor.no/aktuelt/motors-store-vintertest-av-rekkevidde-pa-elbiler/217132"
+webpage <- read_html(url)
+html_table(html_nodes(webpage, "div table")[[1]])
+
+```
+
+```{r, warning = FALSE, message = FALSE, results = 'hide'}
+library(rvest)
+url <- "https://www.motor.no/aktuelt/motors-store-vintertest-av-rekkevidde-pa-elbiler/217132"
+webpage2 <- read_html(url)
+tables <- html_nodes(webpage2, "table")
+car_data <- html_table(tables[[1]], fill = TRUE)
+```
+
+```{r, warning = FALSE, message = FALSE, results = 'hide'}
+
+# a). Create a ggplot, where “stop” is on the y-axis, and “wltp” is on the x-axis. Add a 45-degree   
+     #line showing how far the cars “really” should have driven (red line in my fig below). Create an   
+    #appropriate title and accompanying character text that explains what is “happening” in the figure. 
+
+car_data <- car_data %>% 
+    # i remove the first row of data as its only the colomns names
+  slice(-1) %>% 
+  
+  # first i want to rename the colomns as they currently have names that don't describe them
+  rename("modell" = X1, "wltp" = X2, "stopp" = X3, "avvik" = X4) %>% 
+  
+  # our colomns need to be cleaned up for character, and just be numeric
+  # chatgpt made the code
+  mutate(
+    wltp = as.numeric(gsub(" km.*", "", wltp)),
+    stopp = as.numeric(gsub(" km", "", stopp)),
+    avvik = as.numeric(gsub(" %", "", avvik))
+  ) 
+  
+
+```
+
+```{r, warning = FALSE, message = FALSE, results = 'hide'}
+
+car_data %>% 
+
+  
+  ggplot(aes(wltp, stopp)) +
+  
+  # we want points in our plot for each model
+  geom_point() + 
+  
+  # making our line at 45-degrees
+  geom_abline(slope = 1, intercept = 0, color = "maroon", linewidth = 1) + 
+  
+  # giving the figure appropriate title etc.
+  labs(title = "Expected range of cars vs. actual range",
+       subtitle = "in WLTP values",
+       x = "WLTP (in km)",
+       y = "Stop (in km)",
+       caption = "Source: Raaum, Monn-Iversen, i Motor (2022)") +
+  
+  theme_minimal() +
+  
+  # adjsuting the axis' so that the line starts in 0, but we can still see our points clearly
+  scale_x_continuous(limits = c(150, 700),breaks = seq(150, 700, by = 25), expand = c(0, 0)) + 
+  scale_y_continuous(limits = c(150, 600),breaks = seq(150, 600, by = 25), expand = c(0, 0)) +
+  
+  # making our plot look nicer
+  theme(
+    # putting the position of the legend on the bottom, to widen our plot
+    legend.position = "bottom",
+    # making our title bigger and bolder, placing it in the middle
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+    # placing the subtitle in the middle
+    plot.subtitle = element_text(hjust = 0.5),
+    # placing the axis titles in the middle and making them bold
+    axis.title.x = element_text(hjust = 0.5, face = "bold"),
+    axis.title.y = element_text(hjust = 0.5, face = "bold")
+  )
+```
+
+The figure is showing us how car buyers don't receive what they've been promised in terms of cars' mileage. The red line shows the mileage the car brands should have been able to achieve, while the dots show how far the cars actually were able to drive. Though disappointing numbers, there are a few factors that have to be accounted for. First of, this statistic is based on Norwegian car buys who drive on Norwegian road conditions in typical Norwegian weather. The harsher weather could affect the cars mileage, especially the electric ones who's battery is constantly challenged by rain, snow, hail etc. The drivers habits also has to be taken into consideration: How they treat the car, how they drive it and so on. We can conclude that the disappointing gap between the cars' promised and actual mileage can come down to a number of factors, and are most likely a result of both producer and buyers mishaps.
+
+```{r, warning = FALSE, message = FALSE, results = 'hide'}
+
+# b) None of the car brands reach the red line (expected mileage). But there is a clear positive correlation between what is promised and actual mileage. 
+# Use R’s lm()function. Use “stop” as y variable and “wltp” as an x-variable, and specify the name of your data set. 
+# lm(< Y variable name > ~ <X variable >, data = <dataset name>)
+# After “running” the code, how do you interpret the two values on the customized line?
+# Add the custom line to ggplot using +geom_smooth(method = lm). 
+
+# making or lm data
+lm_data <- lm(stopp ~ wltp, data = car_data)
+
+summary(lm_data)
+
+
+# copying the code from the previous part:
+car_data %>% 
+  
+  ggplot(aes(wltp, stopp)) +
+  
+  # we want points in our plot for each model
+  geom_point() + 
+  
+  # making our line at 45-degrees
+  geom_abline(slope = 1, intercept = 0, color = "maroon", linewidth = 1) + 
+  
+  # adding our regression line
+  geom_smooth(method = "lm", color = "purple") +
+  
+  # giving the figure appropriate title etc.
+  labs(title = "Expected range of cars vs. actual range",
+       subtitle = "in WLTP values",
+       x = "WLTP (in km)",
+       y = "Stop (in km)",
+       caption = "Source: Raaum, Monn-Iversen, i Motor (2022)") +
+  
+  theme_minimal() +
+  
+  # adjsuting the axis' so that the line starts in 0, but we can still see our points clearly
+  scale_x_continuous(limits = c(150, 700),breaks = seq(150, 700, by = 25), expand = c(0, 0)) + 
+  scale_y_continuous(limits = c(150, 600),breaks = seq(150, 600, by = 25), expand = c(0, 0)) +
+  
+  # making our plot look nicer
+  theme(
+    # putting the position of the legend on the bottom, to widen our plot
+    legend.position = "bottom",
+    # making our title bigger and bolder, placing it in the middle
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+    # placing the subtitle in the middle
+    plot.subtitle = element_text(hjust = 0.5),
+    # placing the axis titles in the middle and making them bold
+    axis.title.x = element_text(hjust = 0.5, face = "bold"),
+    axis.title.y = element_text(hjust = 0.5, face = "bold")
+  )
+```
