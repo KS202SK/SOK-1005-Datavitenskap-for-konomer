@@ -151,7 +151,7 @@ table_3 <- df %>%
   # next we can group by the variables and then summarise the profits
   group_by(Region, year, Customer_Segment, Product_Category) %>% 
   
-  summarise(average_profit = sum(Profit, na.rm = TRUE)) %>% 
+  summarise(average_profit = mean(Profit, na.rm = TRUE)) %>% 
   
   # to find the segment with the highest average profit, we can arrange the table from descending values
   arrange(desc(average_profit))
