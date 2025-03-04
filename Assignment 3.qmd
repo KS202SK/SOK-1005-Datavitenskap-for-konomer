@@ -1,0 +1,498 @@
+---
+title: "Assignment 3, SOK-1005 V25"
+author: C.18
+format: html
+echo: false
+output: true
+editor: visual
+---
+
+```{r, warning = FALSE, message = FALSE}
+# downloading the needed libraries
+rm(list = ls())
+library(tidyverse)
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(janitor)
+library(RColorBrewer)
+library(lubridate)
+library(scales)
+library(gapminder)
+```
+
+## Task 1
+
+**Download the data into R and replicate Figure 6, which includes Refugee Support (€).**
+
+```{r, warning = FALSE, message = FALSE}
+# downloading the table from excel
+library(readxl)
+file_path <- "~/Downloads/Ukraine.data.xlsx"
+ukraine_data <- read_excel(file_path)
+
+# Read the 12th sheet which includes the data from Figure 6
+data_6 <- read_excel(file_path, sheet = 12, skip = 8)  
+```
+
+```{r, warning = FALSE, message = FALSE}
+
+# the dataset has colomns that are empty or have information we don't need, therefore we remove them
+data_6 <- data_6 %>% 
+  select(-c(`...7`, `Figure 6. Total bilateral commitments plus refugee costs (billion Euros)`)) %>% 
+  mutate(across(where(is.numeric), ~round(., 2)))
+```
+
+```{r, warning = FALSE, message = FALSE}
+# the data needs to be converted into a longer format to be plotted with
+data_long <- data_6 %>% 
+  pivot_longer(
+    # choosing the colomns
+    cols = 2:5,             
+    names_to = "type",      
+    values_to = "cost"      
+  ) %>% 
+  # removing the "Total" from the country colomn
+  filter(Country != "Total") %>% 
+  # removing na values
+  drop_na()
+
+# reordering the country colomn so the valeus are in descending order
+data_long$Country <- factor(data_long$Country, levels = data_6 %>% arrange(Total) %>% pull(Country))
+# this line of code was produced by Chatgpt
+
+```
+
+```{r, warning = FALSE, message = FALSE}
+
+# recreating the plot of Figure 6 using our data
+# code used for plotting is mostly copied from previous tasks and then modified to fit the spesific task better. This goes for all plotting tasks in the assignment
+
+data_long %>% 
+  
+  ggplot(aes(cost, Country, fill = type)) +
+  
+  geom_bar(stat = "identity", position = "stack", color = "black") +
+  
+  # setting a color palette
+  scale_fill_brewer(palette = "Purples")+
+  
+  labs(
+    title = "(1) Total bilateral commitments plus refugee costs (billion euros)",
+    subtitle = "In OECD countries",
+    x = "Costs in billion euros",
+    y = "Country",
+    color = "Region",
+    caption = "Source: Ukraine Support Tracker",
+    fill = "Type of cost") +
+  # set a minimal theme
+  theme_minimal() +
+  theme(
+    # making our title bigger and bolder, placing it in the middle
+    plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
+    # placing the subtitle in the middle
+    plot.subtitle = element_text(hjust = 0.5),
+    # placing the axis titles in the middle and making them bold
+    axis.title.x = element_text(hjust = 0.5, face = "bold"),
+    axis.title.y = element_text(hjust = 0.5, face = "bold"),
+    axis.text.y = element_text(size = 5),
+    # putting the position of the legend inside the plot and making it pretty
+    legend.position = c(0.8, 0.6),
+    legend.background = element_rect(fill = "white", color = "black", size = 0.5, linetype = "solid"),
+    legend.title = element_text(size = 12, face = "bold", hjust = 0.5)
+  )+
+  # adjusting the values on teh x-axis
+  scale_x_continuous(limits = c(0, 115),breaks = seq(0, 115, by = 10), expand = c(0, 0))
+
+
+```
+
+## Task 2
+
+**1: Find the best month for sales, and visualize using a bar plot.**
+
+```{r, warning = FALSE, message = FALSE}
+# using code from previous assignments and putting in the new url
+url <- "https://raw.githubusercontent.com/ywchiu/rcookbook/master/chapter7/superstore_sales.csv"
+superstore <- read.csv(url)
+superstore <- superstore %>% 
+  # cleaning the names so they're easier to refer to later on
+  clean_names()
+```
+
+```{r, warning = FALSE, message = FALSE}
+
+# making a new dataset for the sales
+super_sales <- superstore %>% 
+  select(order_date, sales, province)
+
+# making new colomns for the year and month
+super_sales <- super_sales %>%
+  mutate(
+    year = year(order_date),
+    month = month(order_date, label = TRUE),
+    year_month = make_date(year, month, 1)
+  )
+
+# grouping by months and summarising to find the total sales
+super_sales <- super_sales %>%
+  group_by(year_month) %>% 
+  summarize(total_sales = sum(sales, na.rm = TRUE)) %>%
+  arrange(desc(total_sales))
+
+
+# making a plot
+super_sales %>% 
+  
+  ggplot(aes(x = total_sales, y = reorder(year_month, total_sales), fill = total_sales))+
+  
+  geom_bar(stat = "identity", fill = "lightpink", color = "#A94064")+
+  
+  labs(
+    title = "(2.1) Total sales per month (2009-2012)",
+    subtitle = "Superstore, all provinces, in descending order",
+    x = "Sales in CAD",
+    y = "Month and year",
+    caption = "Source: GitHub") +
+  # set a minimal theme
+  theme_minimal() +
+  scale_x_continuous(labels = label_comma(), limits = c(0, 550000),breaks = seq(0, 550000, by = 50000))+
+  theme(
+    # putting the position of the legend inside the plot
+    legend.position = "bottom",
+    # making our title bigger and bolder, placing it in the middle
+    plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
+    # placing the subtitle in the middle
+    plot.subtitle = element_text(hjust = 0.5),
+    # placing the axis titles in the middle and making them bold
+    axis.title.x = element_text(hjust = 0.5, face = "bold"),
+    axis.title.y = element_text(hjust = 0.5, face = "bold"),
+    # making the text on the y-axis tiny so the text doesnt fall on top of each other
+    axis.text.y = element_text(size = 5),
+    axis.text.x = element_text(angle = 45, vjust = 0.5)
+  )
+```
+
+**2: Find the province with the highest sales and visualize it using a bar chart. The provinces must be arranged according to the total sales order.** 
+
+```{r, warning = FALSE, message = FALSE}
+
+# making a new dataset based on our main superstore set
+super_sales_province <- superstore %>% 
+  # choosing the appropriate colomns
+  select(sales, province)
+
+# finding the sums of the sales and putting them in descending order
+super_sales_province <- super_sales_province %>%
+  group_by(province) %>% 
+  summarize(total_sales = sum(sales, na.rm = TRUE)) %>%
+  arrange(desc(total_sales))
+
+# plotting the figure
+super_sales_province %>% 
+  
+  ggplot(aes(x = reorder(province, total_sales), y = total_sales, fill = total_sales))+
+  
+  geom_bar(stat = "identity", fill = "lightpink", color = "#A94064")+
+  
+  labs(
+    title = "(2.2) Total sales per province (2009-2012)",
+    subtitle = "Superstore, in ascending order",
+    x = "Province",
+    y = "Sales in CAD",
+    caption = "Source: GitHub") +
+  # set a minimal theme
+  theme_minimal() +
+  scale_y_continuous(labels = label_comma(), limits = c(0, 3100000),breaks = seq(0, 3100000, by = 250000))+
+  theme(
+    # putting the position of the legend inside the plot
+    legend.position = "bottom",
+    # making our title bigger and bolder, placing it in the middle
+    plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
+    # placing the subtitle in the middle
+    plot.subtitle = element_text(hjust = 0.5),
+    # placing the axis titles in the middle and making them bold
+    axis.title.x = element_text(hjust = 0.5, face = "bold"),
+    axis.title.y = element_text(hjust = 0.5, face = "bold"),
+    axis.text.y = element_text(size = 8),
+    axis.text.x = element_text(angle = 90, vjust = 0.5)
+  )
+
+```
+
+**3: In each province, what product category sold the most? Visualize the most sold product category using a bar plot** 
+
+```{r, warning = FALSE, message = FALSE}
+
+# making yet another new dataset
+super_sales_province_category <- superstore %>% 
+  select(sales, province, product_category)
+
+# finding the sums of the sales by category and putting them in descending order
+super_sales_province_category <- super_sales_province_category %>%
+  group_by(province, product_category) %>% 
+  summarize(total_sales = sum(sales, na.rm = TRUE)) %>%
+  arrange(desc(total_sales))
+
+# making another dataset that only includes the top data
+province_category <- super_sales_province_category %>% 
+  # firstly grouping the sales by province
+  group_by(province) %>% 
+  # then slicing the dataset to only include the top value (category) per group (province)
+  slice(1)
+
+# plotting the figure
+province_category %>% 
+  
+  ggplot(aes(x = reorder(province, total_sales), y = total_sales, fill = product_category))+
+  
+  geom_bar(stat = "identity", color = "black")+
+  
+  scale_fill_manual(values = c("Furniture" = "#98BF64", "Office Supplies" = "#3A5311", "Technology" = "#52B2BF")) +  
+  
+  labs(
+    title = "(2.3) Category with the top sales (2009-2012)",
+    subtitle = "Superstore, in ascending order",
+    x = "Province",
+    y = "Sales in CAD",
+    caption = "Source: GitHub",
+    fill = "Product Category") +
+  # set a minimal theme
+  theme_minimal() +
+  scale_y_continuous(labels = label_comma(), limits = c(0, 1200000),breaks = seq(0, 1000000, by = 100000))+
+  theme(
+    # making our title bigger and bolder, placing it in the middle
+    plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
+    # placing the subtitle in the middle
+    plot.subtitle = element_text(hjust = 0.5),
+    # placing the axis titles in the middle and making them bold
+    axis.title.x = element_text(hjust = 0.5, face = "bold"),
+    axis.title.y = element_text(hjust = 0.5, face = "bold"),
+    axis.text.y = element_text(size = 8),
+    axis.text.x = element_text(angle = 90),
+    # putting the position of the legend inside the plot and making it pretty
+    legend.position = c(0.2, 0.6),
+    legend.background = element_rect(fill = "white", color = "black", size = 0.5, linetype = "solid"),
+    legend.title = element_text(size = 12, face = "bold")
+  )
+
+```
+
+## Task 3
+
+**a)  What are the minimum and maximum life expectancy values in Asia for each year?**
+
+```{r, warning = FALSE, message = FALSE}
+
+# mporting gapminder to our enviornment
+data(gapminder)
+
+# making a dataset that filters out all other continents than asia
+asia <- gapminder %>% 
+  filter(continent == "Asia") %>%
+  group_by(year) %>%
+  # summarising to find the min. and max. life expectancy in each country
+  summarize(
+    min_life_expectancy = min(lifeExp, na.rm = TRUE),
+    max_life_expectancy = max(lifeExp, na.rm = TRUE)
+  )
+
+# showing our dataset
+asia
+```
+
+**b) Measure percentage changes using log differentials between years. Which has grown more in Asia—the minimum or maximum life expectancy?**
+
+```{r, warning = FALSE, message = FALSE}
+
+# making a new dataset based on only asian values
+asia_log <- asia %>% 
+  # arraning by year to find yearly values
+  arrange(year) %>% 
+  # making new colomns that consist of the log differentials of the min. and max. life expectancy in each country
+  mutate(
+    log_diff_min = c(NA, diff(log(min_life_expectancy))), 
+    log_diff_max = c(NA, diff(log(max_life_expectancy)))
+  ) %>% 
+  # making more colomns that fins the percentile change based on the years before
+  mutate(
+    change_min = (min_life_expectancy - lag(min_life_expectancy)) / lag(min_life_expectancy) * 100,
+    change_max = (max_life_expectancy - lag(max_life_expectancy)) / lag(max_life_expectancy) * 100
+  )
+
+# finding the average values per country and removing na values
+average_min <- mean(asia_log$change_min, na.rm = TRUE)
+average_max <- mean(asia_log$change_max, na.rm = TRUE)
+
+# printing our results
+cat("Average growth in minimum life expectancy in Asia 1952-2007:", round(average_min, 2), "%\n")
+cat("Average growth in maximum life expectancy in Asia 1952-2007:", round(average_max, 2), "%\n")
+
+cat("The average growth in life expectancy has grown the most within the minimum life expectancy, and it's almost double the average growth of teh maximum life expectancy.")
+
+```
+
+**\
+c). For each country, calculate the average life expectancy and GDP. Create separate point plots for each variable (x) against country (y), including only the top 20 countries, ordered from largest to smallest based on the respective variable.**
+
+```{r, warning = FALSE, message = FALSE}
+
+# making a new dataset that includes the average data of gdp and life expectancy, grouped into both country and continent
+gapminder_average <- gapminder %>% 
+  group_by(country, continent) %>%
+  summarize(
+    avg_life_expectancy = mean(lifeExp, na.rm = TRUE),
+    avg_gdp = mean((pop*gdpPercap), na.rm = TRUE)
+  )
+
+# new dataset that shows the 20 countries with the highest life expectancy in descending order
+top_lifexp <- gapminder_average %>% 
+  arrange(desc(avg_life_expectancy)) %>% 
+  select(country, avg_life_expectancy) %>% 
+  head(20)
+
+# plotting the life expactancy figure
+top_lifexp %>% 
+  ggplot(aes(x = avg_life_expectancy, y = reorder(country, avg_life_expectancy))) + 
+  
+  geom_point(size = 7, shape = '*', color = "#FD5FA8")+
+  
+  labs(
+    title = "(3.3.1) Average life expectancy (1952-2007)",
+    subtitle = "Top 20 countries",
+    x = "Years",
+    y = "Country",
+    caption = "Source: Gapminder")+
+  # set a minimal theme
+  theme_minimal() +
+  scale_x_continuous(limits = c(70, 80),breaks = seq(70, 80, by = 1))+
+  theme(
+    # making our title bigger and bolder, placing it in the middle
+    plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
+    # placing the subtitle in the middle
+    plot.subtitle = element_text(hjust = 0.5),
+    # placing the axis titles in the middle and making them bold
+    axis.title.x = element_text(hjust = 0.5, face = "bold"),
+    axis.title.y = element_text(hjust = 0.5, face = "bold"),
+    axis.text.y = element_text(size = 8),
+    axis.text.x = element_text(angle = 45),
+    legend.position = "none"
+  )
+  
+```
+
+```{r, warning = FALSE, message = FALSE}
+# making a new dataset that includes the average data of gdp and life expectancy, grouped into country, and shows the 20 countries with the highest gdp in descending order
+top_gdp <- gapminder_average %>%
+  # redusing our gdp numbers to be in billions
+  mutate(avg_gdp = avg_gdp * 10^-9) %>% 
+  select(country, avg_gdp) %>% 
+  arrange(desc(avg_gdp)) %>% 
+  head(20)
+
+# making the gdp figure
+top_gdp %>% 
+  ggplot(aes(x = avg_gdp, y = reorder(country, avg_gdp))) + 
+  
+  geom_point(size = 7, shape = '*', color = "#FD5FA8")+
+  
+  labs(
+    title = "(3.3.2) Average GDP (1952-2007)",
+    subtitle = "Top 20 countries",
+    x = "GDP (in billions)",
+    y = "Country",
+    caption = "Source: Gapminder")+
+  # set a minimal theme
+  theme_minimal() +
+  scale_x_continuous(limits = c(0, 6500), breaks = seq(0, 6500, by = 500)) +
+  theme(
+    # making our title bigger and bolder, placing it in the middle
+    plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
+    # placing the subtitle in the middle
+    plot.subtitle = element_text(hjust = 0.5),
+    # placing the axis titles in the middle and making them bold
+    axis.title.x = element_text(hjust = 0.5, face = "bold"),
+    axis.title.y = element_text(hjust = 0.5, face = "bold"),
+    axis.text.y = element_text(size = 8),
+    axis.text.x = element_text(angle = 45),
+    legend.position = "none"
+  )
+```
+
+**d). For each country, calculate the average life expectancy and GDP. Create a point plot of average life expectancy (y) against GDP (x), ensuring that countries are colored differently based on their respective continents. Then, transform the axes to a logarithmic scale.**
+
+```{r, warning = FALSE, message = FALSE}
+
+# using the average dataset from before
+gapminder_average <-gapminder_average %>%
+  # making colomns of the log differentials
+  mutate(
+    log_avg_life_expectancy = log(avg_life_expectancy),
+    log_avg_gdp = log(avg_gdp)
+  )
+  
+# plotting our log life expectancy and gdp figrue
+gapminder_average %>% 
+  ggplot(aes(x = log_avg_gdp, y = log_avg_life_expectancy, color = continent)) + 
+  
+  geom_point(size = 2) +
+  
+  labs(
+    title = "Average life expectancy and GDP (1952-2007)",
+    subtitle = "by country and continent",
+    x = "Average GDP (log scale)",
+    y = "Average life expectancy (log scale)",
+    caption = "Source: Gapminder",
+    color = "Continent"
+  ) +
+  theme_minimal() +
+  scale_color_brewer(palette = "Set1") +
+  scale_x_continuous(limits = c(18, 30), breaks = seq(18, 30, by = 1)) +
+  scale_y_continuous(limits = c(3.5, 4.4), breaks = seq(3.5, 4.4, by = 0.1)) +
+  theme(
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5),
+    axis.title.x = element_text(hjust = 0.5, face = "bold"),
+    axis.title.y = element_text(hjust = 0.5, face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.text.y = element_text(size = 8),
+    legend.position = "bottom"
+  )
+```
+
+**e). For each country, calculate the life expectancy gain in years,  i.e., each (5) year - first year \[1952\].  Within a continent, what country experienced the sharpest 5-year drop in life expectancy?**
+
+**within a country, take (lifeExp in year t) - (lifeExp in year t-1),  positive means lifeExp went up, negative means it went down**
+
+```{r, warning = FALSE, message = FALSE}
+
+# making yet another dataset
+life_exp_gain <- gapminder %>%
+  # filtering out for the first and last year in the gapminder dataset
+    filter(year == 2007) %>%
+    select(country, lifeExp) %>%
+  # joining the datasets together
+    left_join(
+      gapminder %>% 
+        filter(year == 1952) %>%
+        select(country, lifeExp), by = "country", suffix = c("_2007", "_1952")) %>%
+  # making a colomn that gives us the change in life expectancy from the first and last year recorded
+  mutate(life_exp_gain = lifeExp_2007 - lifeExp_1952)
+
+# making one last dataset that shows where the sharpest drop occured
+sharpest_drop <- gapminder %>%
+    group_by(continent, country) %>%
+    arrange(country, year) %>%
+  # finding the change by calculating the change from the year(s) before
+    mutate(lifeExp_change = lifeExp - lag(lifeExp)) %>%
+    filter(!is.na(lifeExp_change)) %>%
+    group_by(continent, country) %>%
+    summarise(sharpest_drop = min(lifeExp_change)) %>%
+    filter(sharpest_drop == min(sharpest_drop))
+
+cat("The sharpest 5-years drops in life expectancy within the different continents are:\n")
+print(as.data.frame(sharpest_drop), row.names = FALSE)
+```
+
+\
+\
